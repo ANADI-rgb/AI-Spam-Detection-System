@@ -1,0 +1,6 @@
+Time,Message,Prediction,Confidence
+2026-03-13 14:52:07.096000,"Congratulations! You have won a free iPhone. Click the link to claim now.
+",Spam,0.9999997869742749
+2026-03-13 14:52:31.207602,"Hey, are we meeting for lunch today?",Not Spam,0.9995180302079614
+2026-03-13 19:06:24.262066,Ok lar... Joking wif u oni...,Not Spam,0.9967370890993416
+2026-03-13 19:29:56.117518,"Nah I don't think he goes to usf, he lives around here though",Not Spam,0.9966329481170076
