@@ -65,16 +65,10 @@ An industry-level AI web application that detects spam, phishing, and legitimate
 
 ---
 
-## 📸 Screenshots
-
-(Add your screenshots here)
-
----
-
 ## 🛠️ Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/AI-Spam-Detection-System.git
+git clone https://github.com/ANADI-rgb/AI-Spam-Detection-System.git
 cd AI-Spam-Detection-System
 pip install -r requirements.txt
 python model_training.py
@@ -95,7 +89,7 @@ python app.py
 
 ## 👨‍💻 Author
 
-**Adi Raj**
+**Aditya Rajput**
 
 ---
 
