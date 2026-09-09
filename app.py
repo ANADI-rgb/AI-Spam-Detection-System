@@ -8,85 +8,158 @@ from explain_ai import analyze_message, highlight_text
 from phishing_detector import detect_phishing
 from gmail_scanner import scan_gmail
 
+
+# --------------------------------------------------
+# Flask App
+# --------------------------------------------------
+
 app = Flask(__name__)
-app.secret_key = "spam_ai_secret"
 
-# Load model
-model_path = "saved_model/best_model.pkl"
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "spam_ai_development_secret"
+)
 
-if not os.path.exists(model_path):
-    print("Model not found! Run model_training.py first.")
-    exit()
 
-model = pickle.load(open(model_path, "rb"))
+# --------------------------------------------------
+# Project Paths
+# --------------------------------------------------
 
-# Store logs
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MODEL_PATH = os.path.join(
+    BASE_DIR,
+    "saved_model",
+    "best_model.pkl"
+)
+
+
+# --------------------------------------------------
+# Load Machine Learning Model
+# --------------------------------------------------
+
+try:
+    with open(MODEL_PATH, "rb") as model_file:
+        model = pickle.load(model_file)
+
+    print("Spam detection model loaded successfully.")
+
+except Exception as e:
+    model = None
+    print(f"Error loading model: {e}")
+
+
+# --------------------------------------------------
+# In-Memory Logs
+# --------------------------------------------------
+
 logs = []
 
-# ---------------- LOGIN ---------------- #
 
-@app.route('/login', methods=['GET','POST'])
+# --------------------------------------------------
+# LOGIN
+# --------------------------------------------------
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
 
     if request.method == "POST":
 
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get("username")
+        password = request.form.get("password")
 
         if validate_user(username, password):
-            session['user'] = username
-            return redirect('/')
-        else:
-            return "Invalid Login"
+            session["user"] = username
+            return redirect("/")
+
+        return "Invalid Login"
 
     return render_template("login.html")
 
 
-# ---------------- DASHBOARD ---------------- #
+# --------------------------------------------------
+# DASHBOARD
+# --------------------------------------------------
 
-@app.route('/')
+@app.route("/")
 def index():
 
-    if 'user' not in session:
-        return redirect('/login')
+    if "user" not in session:
+        return redirect("/login")
 
     return render_template("index.html")
 
 
-# ---------------- PREDICTION (MAIN LOGIC) ---------------- #
+# --------------------------------------------------
+# PREDICTION
+# --------------------------------------------------
 
 @app.route("/predict", methods=["POST"])
 def predict():
 
-    if 'user' not in session:
-        return redirect('/login')
+    if "user" not in session:
+        return redirect("/login")
 
-    message = request.form.get("message")
+    if model is None:
+        return "Machine learning model could not be loaded.", 500
+
+    message = request.form.get("message", "")
     file = request.files.get("email_file")
 
-    if file and file.filename != "":
-        message = file.read().decode("utf-8")
+    # File upload
+    if file and file.filename:
+        try:
+            message = file.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return "Unable to read the uploaded file. Please upload a UTF-8 text file.", 400
 
-    # ML prediction
+    if not message.strip():
+        return "Please enter a message or upload an email file.", 400
+
+    # --------------------------------------------------
+    # ML Prediction
+    # --------------------------------------------------
+
     prediction = model.predict([message])[0]
-    probability = model.predict_proba([message])[0][prediction]
-    confidence = round(probability * 100, 2)
 
-    # AI explanation
+    try:
+        probability = model.predict_proba([message])[0][int(prediction)]
+        confidence = round(float(probability) * 100, 2)
+    except Exception:
+        confidence = 0.0
+
+    # --------------------------------------------------
+    # AI Explanation
+    # --------------------------------------------------
+
     spam_words, phishing_words = analyze_message(message)
 
-    # Phishing check
+    # --------------------------------------------------
+    # Phishing Detection
+    # --------------------------------------------------
+
     if phishing_words:
         result = "Phishing"
+
     elif prediction == 1:
         result = "Spam"
+
     else:
         result = "Not Spam"
 
-    # Highlight text
-    highlighted_message = highlight_text(message, spam_words + phishing_words)
+    # --------------------------------------------------
+    # Highlight Message
+    # --------------------------------------------------
 
-    # Save logs
+    highlighted_message = highlight_text(
+        message,
+        spam_words + phishing_words
+    )
+
+    # --------------------------------------------------
+    # Store Logs
+    # --------------------------------------------------
+
     logs.append({
         "time": datetime.now().strftime("%H:%M:%S"),
         "message": message[:50],
@@ -104,77 +177,109 @@ def predict():
     )
 
 
-# ---------------- GMAIL SCANNER ---------------- #
+# --------------------------------------------------
+# GMAIL SCANNER
+# --------------------------------------------------
 
 @app.route("/gmail")
 def gmail():
 
-    if 'user' not in session:
-        return redirect('/login')
+    if "user" not in session:
+        return redirect("/login")
 
     emails = scan_gmail()
 
-    return render_template("gmail.html", emails=emails)
+    return render_template(
+        "gmail.html",
+        emails=emails
+    )
 
 
-# ---------------- ADMIN ---------------- #
+# --------------------------------------------------
+# ADMIN
+# --------------------------------------------------
 
-@app.route('/admin')
+@app.route("/admin")
 def admin():
 
-    if 'user' not in session:
-        return redirect('/login')
+    if "user" not in session:
+        return redirect("/login")
 
-    return render_template("admin.html", logs=logs)
+    return render_template(
+        "admin.html",
+        logs=logs
+    )
 
 
-# ---------------- LOGOUT ---------------- #
+# --------------------------------------------------
+# LOGOUT
+# --------------------------------------------------
 
-@app.route('/logout')
+@app.route("/logout")
 def logout():
 
-    session.pop('user', None)
-    return redirect('/login')
+    session.pop("user", None)
 
-# ------------- FORGOT PASSWORD ------------ #
+    return redirect("/login")
 
-@app.route('/forgot', methods=['GET','POST'])
+
+# --------------------------------------------------
+# FORGOT PASSWORD
+# --------------------------------------------------
+
+@app.route("/forgot", methods=["GET", "POST"])
 def forgot():
 
     if request.method == "POST":
 
-        username = request.form['username']
-        new_password = request.form['new_password']
+        username = request.form.get("username")
+        new_password = request.form.get("new_password")
 
-        success = reset_password(username, new_password)
+        success = reset_password(
+            username,
+            new_password
+        )
 
         if success:
-            return redirect('/login')
-        else:
-            return "User not found"
+            return redirect("/login")
+
+        return "User not found"
 
     return render_template("forgot.html")
 
-# ---------------- REGISTER ---------------- #
 
-@app.route('/register', methods=['GET','POST'])
+# --------------------------------------------------
+# REGISTER
+# --------------------------------------------------
+
+@app.route("/register", methods=["GET", "POST"])
 def register():
 
     if request.method == "POST":
 
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get("username")
+        password = request.form.get("password")
 
-        success = register_user(username, password)
+        success = register_user(
+            username,
+            password
+        )
 
         if success:
-            return redirect('/login')
-        else:
-            return "User already exists!"
+            return redirect("/login")
+
+        return "User already exists!"
 
     return render_template("register.html")
 
-# ---------------- RUN APP ---------------- #
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# --------------------------------------------------
+# LOCAL DEVELOPMENT
+# --------------------------------------------------
+
+if __name__ == "__main__":
+    app.run(
+        debug=True,
+        host="0.0.0.0",
+        port=5000
+    )

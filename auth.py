@@ -1,19 +1,62 @@
 import json
 import os
 
-USER_FILE = "users.json"
+
+# --------------------------------------------------
+# Users File
+# --------------------------------------------------
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+USER_FILE = os.path.join(
+    BASE_DIR,
+    "users.json"
+)
+
+
+# --------------------------------------------------
+# Load Users
+# --------------------------------------------------
 
 def load_users():
+
     if not os.path.exists(USER_FILE):
         return {}
-    with open(USER_FILE, "r") as f:
-        return json.load(f)
+
+    try:
+        with open(USER_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+# --------------------------------------------------
+# Save Users
+# --------------------------------------------------
 
 def save_users(users):
-    with open(USER_FILE, "w") as f:
-        json.dump(users, f, indent=4)
+
+    try:
+        with open(USER_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                users,
+                f,
+                indent=4
+            )
+
+        return True
+
+    except OSError:
+        return False
+
+
+# --------------------------------------------------
+# Register User
+# --------------------------------------------------
 
 def register_user(username, password):
+
     users = load_users()
 
     if username in users:
@@ -23,23 +66,37 @@ def register_user(username, password):
         "password": password
     }
 
-    save_users(users)
-    return True
+    return save_users(users)
+
+
+# --------------------------------------------------
+# Validate User
+# --------------------------------------------------
 
 def validate_user(username, password):
+
     users = load_users()
 
-    if username in users and users[username]["password"] == password:
+    if (
+        username in users
+        and users[username]["password"] == password
+    ):
         return True
 
     return False
 
+
+# --------------------------------------------------
+# Reset Password
+# --------------------------------------------------
+
 def reset_password(username, new_password):
+
     users = load_users()
 
     if username not in users:
         return False
 
     users[username]["password"] = new_password
-    save_users(users)
-    return True
+
+    return save_users(users)
